@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "valyu-marketplace",
+  "version": "1.0.0",
+  "description": "Valyu Search Plugin marketplace",
+  "owner": {
+    "name": "Ghoui"
+  },
+  "plugins": [
+    {
+      "name": "valyu-search-plugin",
+      "source": ".",
+      "description": "Specialized search tool for Valyu API with 9 search types including web, finance, academic papers, biomedical research, patents, SEC filings, economics, news, and AI-powered answers.",
+      "version": "1.0.0",
+      "category": "productivity"
+    }
+  ]
+}
