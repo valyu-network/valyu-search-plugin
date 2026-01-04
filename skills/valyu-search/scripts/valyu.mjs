@@ -1,180 +1,370 @@
 #!/usr/bin/env node
 
 /**
- * Valyu CLI Tool - Direct API Implementation
- * Usage: valyu <searchType> <query> [maxResults]
- * Example: valyu web "AI news" 10
+ * Valyu CLI Tool - Complete API Implementation
+ * Supports: Search, Answer, Contents, DeepResearch
+ * Usage: valyu <command> [options]
  */
 
 const VALYU_API_BASE = 'https://api.valyu.ai/v1';
 
-// Source configurations for each search type
+// Search type configurations
 const SEARCH_CONFIGS = {
-  web: {
-    search_type: 'web'
-  },
+  web: { search_type: 'web' },
   finance: {
     search_type: 'proprietary',
     included_sources: [
-      'valyu/valyu-stocks',
-      'valyu/valyu-sec-filings',
-      'valyu/valyu-earnings-US',
-      'valyu/valyu-balance-sheet-US',
-      'valyu/valyu-income-statement-US',
-      'valyu/valyu-cash-flow-US',
-      'valyu/valyu-dividends-US',
-      'valyu/valyu-insider-transactions-US',
-      'valyu/valyu-crypto',
-      'valyu/valyu-forex'
+      'valyu/valyu-stocks', 'valyu/valyu-sec-filings', 'valyu/valyu-earnings-US',
+      'valyu/valyu-balance-sheet-US', 'valyu/valyu-income-statement-US',
+      'valyu/valyu-cash-flow-US', 'valyu/valyu-dividends-US',
+      'valyu/valyu-insider-transactions-US', 'valyu/valyu-crypto', 'valyu/valyu-forex'
     ]
   },
   paper: {
     search_type: 'proprietary',
-    included_sources: [
-      'valyu/valyu-arxiv',
-      'valyu/valyu-biorxiv',
-      'valyu/valyu-medrxiv',
-      'valyu/valyu-pubmed'
-    ]
+    included_sources: ['valyu/valyu-arxiv', 'valyu/valyu-biorxiv', 'valyu/valyu-medrxiv', 'valyu/valyu-pubmed']
   },
   bio: {
     search_type: 'proprietary',
     included_sources: [
-      'valyu/valyu-pubmed',
-      'valyu/valyu-biorxiv',
-      'valyu/valyu-medrxiv',
-      'valyu/valyu-clinical-trials',
-      'valyu/valyu-drug-labels'
+      'valyu/valyu-pubmed', 'valyu/valyu-biorxiv', 'valyu/valyu-medrxiv',
+      'valyu/valyu-clinical-trials', 'valyu/valyu-drug-labels'
     ]
   },
-  patent: {
-    search_type: 'proprietary',
-    included_sources: ['valyu/valyu-patents']
-  },
-  sec: {
-    search_type: 'proprietary',
-    included_sources: ['valyu/valyu-sec-filings']
-  },
+  patent: { search_type: 'proprietary', included_sources: ['valyu/valyu-patents'] },
+  sec: { search_type: 'proprietary', included_sources: ['valyu/valyu-sec-filings'] },
   economics: {
     search_type: 'proprietary',
     included_sources: [
-      'valyu/valyu-bls',
-      'valyu/valyu-fred',
-      'valyu/valyu-world-bank',
-      'valyu/valyu-worldbank-indicators',
-      'valyu/valyu-usaspending'
+      'valyu/valyu-bls', 'valyu/valyu-fred', 'valyu/valyu-world-bank',
+      'valyu/valyu-worldbank-indicators', 'valyu/valyu-usaspending'
     ]
   },
-  news: {
-    search_type: 'news'
-  },
-  answer: {
-    useAnswer: true
-  }
+  news: { search_type: 'news' }
 };
+
+async function apiRequest(endpoint, payload) {
+  const apiKey = process.env.VALYU_API_KEY;
+  if (!apiKey) {
+    throw new Error('VALYU_API_KEY environment variable not set');
+  }
+
+  const response = await fetch(`${VALYU_API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API error: ${response.status} - ${errorText}`);
+  }
+
+  return await response.json();
+}
+
+async function search(searchType, query, maxResults = 10) {
+  const config = SEARCH_CONFIGS[searchType];
+  if (!config) {
+    throw new Error(`Invalid search type: ${searchType}`);
+  }
+
+  const payload = {
+    query,
+    max_num_results: maxResults,
+    ...config
+  };
+
+  const data = await apiRequest('/search', payload);
+
+  return {
+    success: true,
+    type: 'search',
+    searchType,
+    query,
+    resultCount: data.results?.length || 0,
+    results: (data.results || []).map(r => ({
+      title: r.title,
+      url: r.url,
+      content: r.content,
+      source: r.source,
+      relevance_score: r.relevance_score
+    })),
+    cost: data.total_deduction_dollars || 0
+  };
+}
+
+async function answer(query, options = {}) {
+  const payload = {
+    query,
+    search_type: options.searchType || 'all',
+    data_max_price: options.dataMaxPrice || 40.0,
+    fast_mode: options.fastMode || false,
+    system_instructions: options.systemInstructions,
+    structured_output: options.structuredOutput,
+    included_sources: options.includedSources,
+    start_date: options.startDate,
+    end_date: options.endDate
+  };
+
+  // Remove undefined fields
+  Object.keys(payload).forEach(key => 
+    payload[key] === undefined && delete payload[key]
+  );
+
+  const data = await apiRequest('/answer', payload);
+
+  return {
+    success: true,
+    type: 'answer',
+    query,
+    answer: data.contents,
+    data_type: data.data_type,
+    sources: data.search_results || [],
+    cost: data.cost?.total_deduction_dollars || 0
+  };
+}
+
+async function contents(urls, options = {}) {
+  const payload = {
+    urls: Array.isArray(urls) ? urls : [urls],
+    response_length: options.responseLength || 'medium',
+    extract_effort: options.extractEffort || 'auto',
+    summary: options.summary !== undefined ? options.summary : false,
+    max_price_dollars: options.maxPriceDollars || 0.1
+  };
+
+  const data = await apiRequest('/contents', payload);
+
+  return {
+    success: data.success,
+    type: 'contents',
+    urls_requested: data.urls_requested,
+    urls_processed: data.urls_processed,
+    urls_failed: data.urls_failed,
+    results: (data.results || []).map(r => ({
+      title: r.title,
+      url: r.url,
+      content: r.content,
+      data_type: r.data_type,
+      summary_success: r.summary_success,
+      length: r.length
+    })),
+    total_cost: data.total_cost_dollars || 0
+  };
+}
+
+async function deepresearchCreate(input, options = {}) {
+  const payload = {
+    input,
+    model: options.model || 'lite',
+    output_formats: options.outputFormats || ['markdown'],
+    search: options.search,
+    urls: options.urls,
+    files: options.files,
+    webhook_url: options.webhookUrl
+  };
+
+  // Remove undefined fields
+  Object.keys(payload).forEach(key => 
+    payload[key] === undefined && delete payload[key]
+  );
+
+  const data = await apiRequest('/deepresearch/tasks', payload);
+
+  return {
+    success: true,
+    type: 'deepresearch_create',
+    deepresearch_id: data.deepresearch_id,
+    status: data.status,
+    query: data.query,
+    model: data.mode,
+    webhook_secret: data.webhook_secret,
+    created_at: data.created_at
+  };
+}
+
+async function deepresearchStatus(taskId) {
+  const apiKey = process.env.VALYU_API_KEY;
+  if (!apiKey) {
+    throw new Error('VALYU_API_KEY environment variable not set');
+  }
+
+  const response = await fetch(`${VALYU_API_BASE}/deepresearch/tasks/${taskId}/status`, {
+    method: 'GET',
+    headers: { 'x-api-key': apiKey }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    success: true,
+    type: 'deepresearch_status',
+    deepresearch_id: data.deepresearch_id,
+    status: data.status,
+    query: data.query,
+    output: data.output,
+    pdf_url: data.pdf_url,
+    sources: data.sources,
+    progress: data.progress,
+    usage: data.usage,
+    completed_at: data.completed_at
+  };
+}
+
+function printUsage() {
+  console.log(`
+Valyu CLI - Complete API Tool
+
+SEARCH COMMANDS:
+  valyu search <type> <query> [maxResults]
+    Types: web, finance, paper, bio, patent, sec, economics, news
+    Example: valyu search web "AI news" 10
+
+ANSWER COMMAND:
+  valyu answer <query> [options]
+    Options: --fast, --structured <json-schema>
+    Example: valyu answer "What is quantum computing?" --fast
+
+CONTENTS COMMAND:
+  valyu contents <url> [options]
+    Options: --summary [instructions], --structured <json-schema>
+    Example: valyu contents "https://example.com" --summary
+    Example: valyu contents "https://example.com" --summary "Key findings in 2 paragraphs"
+
+DEEPRESEARCH COMMANDS:
+  valyu deepresearch create <query> [options]
+    Options: --model <fast|lite|heavy>, --pdf, --json <schema>
+    Example: valyu deepresearch create "AI market trends" --model heavy --pdf
+    
+  valyu deepresearch status <task-id>
+    Example: valyu deepresearch status f992a8ab-4c91-4322-905f-190107bd5a5b
+
+Environment: VALYU_API_KEY required
+  `);
+}
 
 async function main() {
   const args = process.argv.slice(2);
 
-  if (args.length < 2) {
-    console.error('Usage: valyu <searchType> <query> [maxResults]');
-    console.error('');
-    console.error('Search types: web, finance, paper, bio, patent, sec, economics, news, answer');
-    console.error('');
-    console.error('Examples:');
-    console.error('  valyu web "AI news 2025" 10');
-    console.error('  valyu bio "cancer treatments"');
-    console.error('  valyu answer "What is quantum computing?"');
+  if (args.length === 0) {
+    printUsage();
     process.exit(1);
   }
 
-  const searchType = args[0].toLowerCase();
-  const query = args[1];
-  const maxResults = args[2] ? parseInt(args[2]) : 10;
-
-  if (!SEARCH_CONFIGS[searchType]) {
-    console.error(`Invalid search type: ${searchType}`);
-    console.error(`Valid types: ${Object.keys(SEARCH_CONFIGS).join(', ')}`);
-    process.exit(1);
-  }
-
-  if (!process.env.VALYU_API_KEY) {
-    console.error('Error: VALYU_API_KEY environment variable not set');
-    process.exit(1);
-  }
-
-  const apiKey = process.env.VALYU_API_KEY;
-  const config = SEARCH_CONFIGS[searchType];
+  const command = args[0].toLowerCase();
 
   try {
-    let endpoint, payload;
+    let result;
 
-    if (config.useAnswer) {
-      // Use Answer API
-      endpoint = `${VALYU_API_BASE}/answer`;
-      payload = {
-        query: query,
-        search_type: 'all',
-        data_max_price: 40.0
-      };
+    if (command === 'search') {
+      const searchType = args[1]?.toLowerCase();
+      const query = args[2];
+      const maxResults = args[3] ? parseInt(args[3]) : 10;
+      
+      if (!searchType || !query) {
+        console.error('Usage: valyu search <type> <query> [maxResults]');
+        process.exit(1);
+      }
+      
+      result = await search(searchType, query, maxResults);
+
+    } else if (command === 'answer') {
+      const query = args[1];
+      if (!query) {
+        console.error('Usage: valyu answer <query> [--fast] [--structured <schema>]');
+        process.exit(1);
+      }
+
+      const options = {};
+      for (let i = 2; i < args.length; i++) {
+        if (args[i] === '--fast') options.fastMode = true;
+        if (args[i] === '--structured' && args[i + 1]) {
+          options.structuredOutput = JSON.parse(args[i + 1]);
+          i++;
+        }
+      }
+
+      result = await answer(query, options);
+
+    } else if (command === 'contents') {
+      const url = args[1];
+      if (!url) {
+        console.error('Usage: valyu contents <url> [--summary [instructions]] [--structured <schema>]');
+        process.exit(1);
+      }
+
+      const options = {};
+      for (let i = 2; i < args.length; i++) {
+        if (args[i] === '--summary') {
+          if (args[i + 1] && !args[i + 1].startsWith('--')) {
+            options.summary = args[i + 1];
+            i++;
+          } else {
+            options.summary = true;
+          }
+        }
+        if (args[i] === '--structured' && args[i + 1]) {
+          options.summary = JSON.parse(args[i + 1]);
+          i++;
+        }
+      }
+
+      result = await contents(url, options);
+
+    } else if (command === 'deepresearch') {
+      const subcommand = args[1]?.toLowerCase();
+
+      if (subcommand === 'create') {
+        const query = args[2];
+        if (!query) {
+          console.error('Usage: valyu deepresearch create <query> [--model <fast|lite|heavy>] [--pdf]');
+          process.exit(1);
+        }
+
+        const options = {};
+        for (let i = 3; i < args.length; i++) {
+          if (args[i] === '--model' && args[i + 1]) {
+            options.model = args[i + 1];
+            i++;
+          }
+          if (args[i] === '--pdf') {
+            options.outputFormats = ['markdown', 'pdf'];
+          }
+        }
+
+        result = await deepresearchCreate(query, options);
+
+      } else if (subcommand === 'status') {
+        const taskId = args[2];
+        if (!taskId) {
+          console.error('Usage: valyu deepresearch status <task-id>');
+          process.exit(1);
+        }
+
+        result = await deepresearchStatus(taskId);
+
+      } else {
+        console.error('Valid deepresearch subcommands: create, status');
+        process.exit(1);
+      }
+
     } else {
-      // Use Search API
-      endpoint = `${VALYU_API_BASE}/search`;
-      payload = {
-        query: query,
-        max_num_results: maxResults,
-        ...config
-      };
-    }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(JSON.stringify({
-        success: false,
-        error: `API error: ${response.status} - ${errorText}`
-      }, null, 2));
+      console.error(`Unknown command: ${command}`);
+      printUsage();
       process.exit(1);
     }
 
-    const data = await response.json();
+    console.log(JSON.stringify(result, null, 2));
 
-    if (config.useAnswer) {
-      // Answer API response
-      console.log(JSON.stringify({
-        success: true,
-        type: 'answer',
-        query: query,
-        answer: data.contents,
-        sources: data.search_results || [],
-        cost: data.cost?.total_deduction_dollars || 0
-      }, null, 2));
-    } else {
-      // Search API response
-      console.log(JSON.stringify({
-        success: true,
-        type: 'search',
-        searchType: searchType,
-        query: query,
-        resultCount: data.results?.length || 0,
-        results: (data.results || []).map(r => ({
-          title: r.title,
-          url: r.url,
-          content: r.content,
-          source: r.source,
-          relevance_score: r.relevance_score
-        })),
-        cost: data.total_deduction_dollars || 0
-      }, null, 2));
-    }
   } catch (error) {
     console.error(JSON.stringify({
       success: false,
