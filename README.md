@@ -26,7 +26,7 @@ Specialized search tool that provides Claude Code with direct access to Valyu's 
 
 ```bash
 # Add the marketplace (once you've pushed to GitHub)
-/plugin marketplace add Ghoui/valyu-search-plugin
+/plugin marketplace add yourusername/valyu-search-plugin
 
 # Install the plugin
 /plugin install valyu-search-plugin@valyu-marketplace
