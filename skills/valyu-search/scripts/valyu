@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Valyu CLI wrapper
+# This makes it easier to call from bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+node "${SCRIPT_DIR}/valyu.mjs" "$@"
