@@ -4,7 +4,7 @@ Specialized search tool that provides Claude Code with direct access to Valyu's 
 
 ## Features
 
-🔍 **9 Search Types:**
+**8 Search Types:**
 - `web` - General web search
 - `finance` - Financial data (stocks, earnings, SEC filings, crypto)
 - `paper` - Academic papers (arXiv, PubMed)
@@ -13,47 +13,97 @@ Specialized search tool that provides Claude Code with direct access to Valyu's 
 - `sec` - SEC regulatory filings
 - `economics` - Economic indicators (BLS, FRED, World Bank)
 - `news` - News articles
-- `answer` - AI-powered answers with sources
 
-⚡ **Zero Dependencies:**
+**Plus:**
+- `answer` - AI-powered answers with sources
+- `contents` - Extract content from URLs
+- `deepresearch` - Async deep research reports
+
+**Zero Dependencies:**
 - Direct API calls using Node.js built-in `fetch`
 - No npm packages required
 - Just Node.js 18+ and your Valyu API key
 
 ## Installation
 
-### From Marketplace
-
 ```bash
-/plugin marketplace add Ghoui/valyu-search-plugin
+# Add the marketplace
+/plugin marketplace add valyu-network/valyu-search-plugin
 
 # Install the plugin
 /plugin install valyu-search-plugin@valyu-marketplace
 ```
 
-### Manual Installation
+## API Key Setup
 
-1. Download the plugin
-2. Set your Valyu API key:
-```bash
-export VALYU_API_KEY="your-api-key-here"
+Get your API key from [platform.valyu.ai](https://platform.valyu.ai) ($10 free credits).
+
+### Automatic Setup (Recommended)
+
+Just start using the plugin! On first use, Claude will:
+1. Detect that no API key is configured
+2. Ask you to paste your API key
+3. Save it automatically to `~/.valyu/config.json`
+4. Retry your search
+
 ```
-3. Use the simple `Valyu()` syntax
+You: Valyu(web, "AI news 2025")
+Claude: "To use Valyu search, I need your API key. Get one free at https://platform.valyu.ai"
+You: val_abc123...
+Claude: [saves key and runs search]
+```
+
+### Manual Setup (Alternative)
+
+If you prefer to set up manually:
+
+**Option 1: Environment Variable**
+
+For Zsh (macOS default):
+```bash
+echo 'export VALYU_API_KEY="your-api-key-here"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+For Bash:
+```bash
+echo 'export VALYU_API_KEY="your-api-key-here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Option 2: Config File**
+
+```bash
+mkdir -p ~/.valyu
+echo '{"apiKey": "your-api-key-here"}' > ~/.valyu/config.json
+```
+
+**Option 3: VSCode Settings** (for GUI-launched VSCode)
+
+Add to your `settings.json`:
+```json
+{
+  "terminal.integrated.env.osx": {
+    "VALYU_API_KEY": "your-api-key-here"
+  }
+}
+```
+
+### Key Lookup Priority
+
+The plugin checks for API keys in this order:
+1. `VALYU_API_KEY` environment variable
+2. `~/.valyu/config.json` file
 
 ## Usage
 
-### Simple Syntax
+### Search
 
 ```
-Valyu(searchType, query, maxResults)
+Valyu(searchType, "query", maxResults)
 ```
 
-Where:
-- `searchType`: One of the 9 search types listed above
-- `query`: Your search query
-- `maxResults`: Optional, defaults to 10
-
-### Examples
+**Search Types:** `web`, `finance`, `paper`, `bio`, `patent`, `sec`, `economics`, `news`
 
 ```bash
 # Web search
@@ -67,17 +117,33 @@ Valyu(finance, "Apple Q4 2024 earnings", 8)
 
 # Academic papers
 Valyu(paper, "transformer neural networks", 15)
-
-# AI-powered answer
-Valyu(answer, "What is quantum computing?")
 ```
 
-Claude Code will execute these as:
+### Answer
+
+Get AI-powered answers with source citations:
+
 ```bash
-scripts/valyu web "AI developments 2025" 10
-scripts/valyu bio "cancer immunotherapy clinical trials"
-scripts/valyu finance "Apple Q4 2024 earnings" 8
-# etc...
+Valyu(answer, "What is quantum computing?")
+Valyu(answer, "Latest AI news", --fast)
+```
+
+### Contents
+
+Extract content from URLs:
+
+```bash
+Valyu(contents, "https://example.com/article")
+Valyu(contents, "https://example.com", --summary)
+```
+
+### DeepResearch
+
+Create async research reports:
+
+```bash
+Valyu(deepresearch, create, "AI market trends 2025")
+Valyu(deepresearch, status, "task-id-here")
 ```
 
 ## Output
@@ -135,7 +201,7 @@ MIT
 
 ## Author
 
-Abdul
+Valyu AI
 
 ## Links
 
