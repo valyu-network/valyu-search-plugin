@@ -2,6 +2,8 @@
 
 Specialized search tool that provides Claude Code with direct access to Valyu's search APIs through a simple CLI interface.
 
+> **Acknowledgment:** Special thanks to [@GhouI](https://github.com/GhouI) for the original implementation of this plugin. Your work laid the foundation for what this has and will become!
+
 ## Features
 
 **8 Search Types:**
