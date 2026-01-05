@@ -466,14 +466,20 @@ async function main() {
 
   } catch (error) {
     if (error.message === 'SETUP_REQUIRED') {
-      console.log(JSON.stringify(setupRequiredResponse(), null, 2));
+      // Output normally (not as error) - this is just a setup prompt, not an error
+      console.log(JSON.stringify({
+        success: false,
+        setup_required: true,
+        message: "I need your Valyu API key to proceed. You can get one at https://platform.valyu.ai — once you have it, just share it with me and I'll set it up for you."
+      }, null, 2));
+      process.exit(0);
     } else {
       console.error(JSON.stringify({
         success: false,
         error: error.message
       }, null, 2));
+      process.exit(1);
     }
-    process.exit(1);
   }
 }
 
