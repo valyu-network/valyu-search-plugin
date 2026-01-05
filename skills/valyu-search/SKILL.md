@@ -7,6 +7,42 @@ description: Complete Valyu API toolkit with Search, Answer, Contents extraction
 
 Comprehensive CLI tool for all Valyu APIs: Search, Answer, Contents, and DeepResearch.
 
+## CRITICAL: Script Path Resolution
+
+**IMPORTANT:** The `scripts/valyu` commands in this documentation are relative to this skill's installation directory, NOT the user's current working directory.
+
+### Finding the Script Path
+
+Before running any command, you MUST locate the script using one of these methods:
+
+1. **For marketplace installs**, the script is at:
+   ```
+   ~/.claude/plugins/cache/valyu-marketplace/valyu-search-plugin/<version>/skills/valyu-search/scripts/valyu
+   ```
+
+2. **Quick method** - Find it dynamically:
+   ```bash
+   VALYU_SCRIPT=$(find ~/.claude/plugins/cache -name "valyu" -path "*/valyu-search-plugin/*/scripts/*" -type f 2>/dev/null | head -1)
+   ```
+
+3. **Then use the full path** for all commands:
+   ```bash
+   $VALYU_SCRIPT search web "query"
+   # OR use the full path directly:
+   ~/.claude/plugins/cache/valyu-marketplace/valyu-search-plugin/1.0.0/skills/valyu-search/scripts/valyu search web "query"
+   ```
+
+4. **Self-location commands** - Once you have the path, you can verify it:
+   ```bash
+   /path/to/valyu --path      # Prints the script's full path
+   /path/to/valyu --script-dir # Prints the script's directory
+   ```
+
+### Important Notes
+- NEVER run `scripts/valyu` directly - it will fail with "no such file or directory"
+- ALWAYS use the full absolute path to the script
+- The version number in the path (e.g., `1.0.0`) may change with updates
+
 ## IMPORTANT: API Key Setup Flow
 
 When you run any Valyu command and receive a response with `"setup_required": true`, follow this flow:
