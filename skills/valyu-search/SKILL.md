@@ -7,14 +7,44 @@ description: Complete Valyu API toolkit with Search, Answer, Contents extraction
 
 Comprehensive CLI tool for all Valyu APIs: Search, Answer, Contents, and DeepResearch.
 
-## Installation
+## IMPORTANT: API Key Setup Flow
 
-Requirements:
+When you run any Valyu command and receive a response with `"setup_required": true`, follow this flow:
+
+1. **Ask the user for their API key:**
+   "To use Valyu search, I need your API key. You can get one free ($10 credits) at https://platform.valyu.ai. Please paste your API key."
+
+2. **Once the user provides the key, run the setup command:**
+   ```bash
+   scripts/valyu setup <api-key>
+   ```
+
+3. **After successful setup, retry the original command.**
+
+### Example Flow:
+```
+User: Valyu(web, "AI news")
+→ Response: {"success": false, "setup_required": true, ...}
+→ Claude asks: "Please provide your Valyu API key from https://platform.valyu.ai"
+→ User: "val_abc123..."
+→ Claude runs: scripts/valyu setup val_abc123...
+→ Response: {"success": true, "type": "setup", "message": "API key saved..."}
+→ Claude retries: scripts/valyu search web "AI news"
+→ Success!
+```
+
+## Requirements
+
 1. Node.js 18+ (uses built-in fetch)
-2. Set environment variable: `export VALYU_API_KEY=your-api-key`
+2. API key from https://platform.valyu.ai (setup automatically via `scripts/valyu setup <key>`)
 3. Scripts are executable (already set in packaged skill)
 
 ## Commands Overview
+
+### 0. SETUP - Configure API key (auto-triggered on first use)
+```bash
+scripts/valyu setup <api-key>
+```
 
 ### 1. SEARCH - Multi-domain search
 ```bash

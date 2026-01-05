@@ -6,7 +6,72 @@
  * Usage: valyu <command> [options]
  */
 
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
+
 const VALYU_API_BASE = 'https://api.valyu.ai/v1';
+const CONFIG_DIR = join(homedir(), '.valyu');
+const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
+
+/**
+ * Get API key from multiple sources (in order of priority):
+ * 1. Environment variable (VALYU_API_KEY)
+ * 2. Config file (~/.valyu/config.json)
+ */
+function getApiKey() {
+  // 1. Check environment variable first
+  if (process.env.VALYU_API_KEY) {
+    return process.env.VALYU_API_KEY;
+  }
+
+  // 2. Try config file (~/.valyu/config.json)
+  if (existsSync(CONFIG_FILE)) {
+    try {
+      const config = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
+      if (config.apiKey) {
+        return config.apiKey;
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Save API key to config file
+ */
+function saveApiKey(apiKey) {
+  if (!existsSync(CONFIG_DIR)) {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+  }
+
+  let config = {};
+  if (existsSync(CONFIG_FILE)) {
+    try {
+      config = JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
+    } catch (e) {
+      // Start fresh if parse fails
+    }
+  }
+
+  config.apiKey = apiKey;
+  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  return true;
+}
+
+/**
+ * Return setup required response
+ */
+function setupRequiredResponse() {
+  return {
+    success: false,
+    setup_required: true,
+    message: "Valyu API key not configured. Please ask the user for their API key from https://platform.valyu.ai, then run: scripts/valyu setup <api-key>"
+  };
+}
 
 // Search type configurations
 const SEARCH_CONFIGS = {
@@ -44,9 +109,9 @@ const SEARCH_CONFIGS = {
 };
 
 async function apiRequest(endpoint, payload) {
-  const apiKey = process.env.VALYU_API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error('VALYU_API_KEY environment variable not set');
+    throw new Error('SETUP_REQUIRED');
   }
 
   const response = await fetch(`${VALYU_API_BASE}${endpoint}`, {
@@ -188,9 +253,9 @@ async function deepresearchCreate(input, options = {}) {
 }
 
 async function deepresearchStatus(taskId) {
-  const apiKey = process.env.VALYU_API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    throw new Error('VALYU_API_KEY environment variable not set');
+    throw new Error('SETUP_REQUIRED');
   }
 
   const response = await fetch(`${VALYU_API_BASE}/deepresearch/tasks/${taskId}/status`, {
@@ -224,6 +289,11 @@ function printUsage() {
   console.log(`
 Valyu CLI - Complete API Tool
 
+SETUP COMMAND:
+  valyu setup <api-key>
+    Save your API key to ~/.valyu/config.json
+    Get your key at: https://platform.valyu.ai
+
 SEARCH COMMANDS:
   valyu search <type> <query> [maxResults]
     Types: web, finance, paper, bio, patent, sec, economics, news
@@ -244,11 +314,11 @@ DEEPRESEARCH COMMANDS:
   valyu deepresearch create <query> [options]
     Options: --model <fast|lite|heavy>, --pdf, --json <schema>
     Example: valyu deepresearch create "AI market trends" --model heavy --pdf
-    
+
   valyu deepresearch status <task-id>
     Example: valyu deepresearch status f992a8ab-4c91-4322-905f-190107bd5a5b
 
-Environment: VALYU_API_KEY required
+API Key: Set VALYU_API_KEY env var OR run 'valyu setup <key>'
   `);
 }
 
@@ -261,6 +331,35 @@ async function main() {
   }
 
   const command = args[0].toLowerCase();
+
+  // Handle setup command separately (before API key check)
+  if (command === 'setup') {
+    const apiKey = args[1];
+    if (!apiKey) {
+      console.error(JSON.stringify({
+        success: false,
+        error: 'Usage: valyu setup <api-key>'
+      }, null, 2));
+      process.exit(1);
+    }
+
+    try {
+      saveApiKey(apiKey);
+      console.log(JSON.stringify({
+        success: true,
+        type: 'setup',
+        message: 'API key saved successfully to ~/.valyu/config.json',
+        config_path: CONFIG_FILE
+      }, null, 2));
+      process.exit(0);
+    } catch (error) {
+      console.error(JSON.stringify({
+        success: false,
+        error: `Failed to save API key: ${error.message}`
+      }, null, 2));
+      process.exit(1);
+    }
+  }
 
   try {
     let result;
@@ -366,10 +465,14 @@ async function main() {
     console.log(JSON.stringify(result, null, 2));
 
   } catch (error) {
-    console.error(JSON.stringify({
-      success: false,
-      error: error.message
-    }, null, 2));
+    if (error.message === 'SETUP_REQUIRED') {
+      console.log(JSON.stringify(setupRequiredResponse(), null, 2));
+    } else {
+      console.error(JSON.stringify({
+        success: false,
+        error: error.message
+      }, null, 2));
+    }
     process.exit(1);
   }
 }
